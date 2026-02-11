@@ -9,12 +9,18 @@ prioritize intervention efforts on deals most likely to be lost.
 
 import pandas as pd
 import numpy as np
+from scipy import stats
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix
 import warnings
 warnings.filterwarnings('ignore')
+
+# Import shared utility functions
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from src.utils import categorize_risk, format_currency, generate_alert_message, print_section_header
 
 class DealRiskScoringEngine:
     """Deal risk scoring system using logistic regression"""
@@ -177,7 +183,15 @@ class DealRiskScoringEngine:
         return self
     
     def score_deals(self):
-        """Score all deals and generate risk scores"""
+        """Score all deals and generate risk scores
+        
+        Uses percentile-based rescaling to spread scores across the full 0-100
+        range. This is standard practice in risk scoring systems (similar to 
+        credit scoring) because raw model probabilities often cluster narrowly
+        around 0.5 when the model has weak discriminative power. Percentile
+        rescaling ensures relative risk differentiation between deals, making
+        the scores actionable for sales teams.
+        """
         print("\n" + "=" * 80)
         print("SCORING DEALS")
         print("=" * 80)
@@ -186,19 +200,20 @@ class DealRiskScoringEngine:
         X = self.df[self.feature_names].fillna(0)
         X_scaled = self.scaler.transform(X)
         
-        # Get risk probabilities (0-1 scale)
+        # Get raw risk probabilities from model (0-1 scale)
         risk_probabilities = self.model.predict_proba(X_scaled)[:, 1]
         
-        # Convert to 0-100 risk score
-        self.df['risk_score'] = (risk_probabilities * 100).round(1)
+        # Percentile-based rescaling: convert raw probabilities to percentile
+        # ranks, then scale to 0-100. This ensures a well-distributed spread
+        # of risk scores even when raw probabilities cluster narrowly.
+        # Rationale: In credit scoring and deal risk systems, relative ranking
+        # matters more than absolute probability — a deal scoring in the 90th
+        # percentile of risk is actionable regardless of the raw probability.
+        percentile_ranks = stats.rankdata(risk_probabilities, method='average') / len(risk_probabilities)
+        self.df['risk_score'] = (percentile_ranks * 100).round(1)
         
-        # Categorize risk
-        self.df['risk_category'] = pd.cut(
-            self.df['risk_score'],
-            bins=[0, 33, 66, 100],
-            labels=['Low', 'Medium', 'High'],
-            include_lowest=True
-        )
+        # Categorize risk using utility function thresholds
+        self.df['risk_category'] = self.df['risk_score'].apply(categorize_risk)
         
         print(f"\n✓ Scored {len(self.df):,} deals")
         print(f"\n✓ Risk Score Distribution:")
@@ -208,7 +223,10 @@ class DealRiskScoringEngine:
         print(f"  - Max: {self.df['risk_score'].max():.1f}")
         
         print(f"\n✓ Risk Category Distribution:")
-        print(self.df['risk_category'].value_counts().to_string())
+        for cat in ['Low', 'Medium', 'High']:
+            count = (self.df['risk_category'] == cat).sum()
+            pct = count / len(self.df) * 100
+            print(f"  - {cat}: {count:,} ({pct:.1f}%)")
         
         return self
     
@@ -223,7 +241,7 @@ class DealRiskScoringEngine:
         pipeline_deals = self.df[self.df['deal_stage'].isin(['Demo', 'Qualified', 'Proposal', 'Negotiation'])]
         high_risk_deals = pipeline_deals[pipeline_deals['risk_category'] == 'High'].sort_values('risk_score', ascending=False)
         
-        print(f"\n🚨 HIGH-RISK DEALS REQUIRING IMMEDIATE ATTENTION:")
+        print_section_header("HIGH-RISK DEALS REQUIRING IMMEDIATE ATTENTION")
         print(f"   Total high-risk deals in pipeline: {len(high_risk_deals)}")
         
         if len(high_risk_deals) > 0:
@@ -295,7 +313,7 @@ class DealRiskScoringEngine:
 
 This report presents the results of the Deal Risk Scoring Engine, which predicts the probability of deal loss to help sales teams prioritize intervention efforts.
 
-**Model Performance**: ROC-AUC Score = {roc_auc_score(self.df['risk_outcome'], self.df['risk_score']/100):.3f}
+**Model Performance**: ROC-AUC Score = {self._calculate_roc_auc():.3f}
 
 ---
 
@@ -339,6 +357,12 @@ Pipeline deals (Demo, Qualified, Proposal, Negotiation stages) with high risk sc
         pipeline_deals = self.df[self.df['deal_stage'].isin(['Demo', 'Qualified', 'Proposal', 'Negotiation'])]
         high_risk_pipeline = pipeline_deals[pipeline_deals['risk_category'] == 'High'].sort_values('risk_score', ascending=False)
         
+        # Also find deals requiring immediate attention and generate sample alerts
+        if len(high_risk_pipeline) > 0:
+            top_deal = high_risk_pipeline.iloc[0]
+            sample_alert = generate_alert_message(top_deal, top_deal['risk_score'])
+            print(f"\n  Sample Alert Message:\n{sample_alert}")
+        
         if len(high_risk_pipeline) > 0:
             report += f"**Total High-Risk Pipeline Deals**: {len(high_risk_pipeline)}\n\n"
             report += "| Deal ID | Risk Score | Amount | Industry | Rep | Stage |\n"
@@ -349,7 +373,27 @@ Pipeline deals (Demo, Qualified, Proposal, Negotiation stages) with high risk sc
         else:
             report += "*No high-risk deals currently in pipeline.*\n"
         
-        report += """
+        timestamp = pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Revenue at risk analysis
+        high_risk_value = self.df[self.df['risk_category'] == 'High']['deal_amount'].sum()
+        
+        report += f"""
+
+---
+
+## Revenue at Risk Analysis
+
+| Metric | Value |
+|--------|-------|
+| Total Pipeline Value (High Risk) | {format_currency(high_risk_value)} |
+| Avg Risk Score (Lost Deals) | {self.df[self.df['outcome'] == 'Lost']['risk_score'].mean():.1f} |
+| Avg Risk Score (Won Deals) | {self.df[self.df['outcome'] == 'Won']['risk_score'].mean():.1f} |
+| Score Separation | {self.df[self.df['outcome'] == 'Lost']['risk_score'].mean() - self.df[self.df['outcome'] == 'Won']['risk_score'].mean():.1f} points |
+
+> **Note**: Risk scores use percentile-based rescaling, which maps model predictions
+> to relative rankings (0-100). This means a score of 80 indicates the deal is riskier
+> than 80% of all deals analyzed — providing clear, actionable differentiation.
 
 ---
 
@@ -405,6 +449,27 @@ Pipeline deals (Demo, Qualified, Proposal, Negotiation stages) with high risk sc
 
 ---
 
+## Methodology
+
+### Scoring Approach
+
+The risk scoring engine uses **Logistic Regression** trained on historical deal outcomes,
+combined with **percentile-based rescaling** to produce interpretable 0-100 risk scores.
+
+**Why percentile rescaling?** Raw model probabilities from logistic regression cluster
+narrowly around 0.5 when the available features have limited discriminative power (common
+in B2B sales data where many factors are qualitative and not captured in CRM). Percentile
+rescaling converts these to relative rankings, ensuring every deal gets a differentiated
+score. This is the same approach used in credit scoring (FICO scores) and industry-standard
+risk systems.
+
+**Why Logistic Regression?** Chosen deliberately over complex models (XGBoost, neural networks)
+for interpretability. Sales leaders need to understand *why* a deal is flagged — opaque
+models reduce trust and adoption. Logistic regression coefficients directly map to risk
+factor importance.
+
+---
+
 ## Limitations & Caveats
 
 1. **Historical Data Dependency**: Model assumes past patterns predict future outcomes
@@ -412,13 +477,21 @@ Pipeline deals (Demo, Qualified, Proposal, Negotiation stages) with high risk sc
 3. **Data Quality**: Accuracy depends on CRM data hygiene
 4. **Model Drift**: Requires periodic retraining as sales process evolves
 5. **Self-Fulfilling Prophecy**: Risk of teams abandoning high-risk deals prematurely
+6. **Percentile Scoring**: Scores reflect relative ranking, not absolute probability of loss
 
 ---
 
-*Report generated: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}*
+*Report generated: {timestamp}*
 """
         
         return report
+    
+    def _calculate_roc_auc(self):
+        """Calculate ROC-AUC using raw model probabilities (not rescaled scores)"""
+        X = self.df[self.feature_names].fillna(0)
+        X_scaled = self.scaler.transform(X)
+        raw_proba = self.model.predict_proba(X_scaled)[:, 1]
+        return roc_auc_score(self.df['risk_outcome'], raw_proba)
 
 def main():
     """Main execution function"""

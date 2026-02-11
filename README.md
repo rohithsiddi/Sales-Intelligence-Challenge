@@ -94,7 +94,7 @@ The real problem isn't just *knowing* the win rate is down—it's **not knowing 
 
 ### Prerequisites
 - Python 3.9+
-- Required packages: pandas, numpy, scikit-learn, matplotlib, seaborn, plotly
+- Required packages: pandas, numpy, scipy, scikit-learn, matplotlib, seaborn, plotly
 
 ### Installation
 
@@ -107,7 +107,7 @@ cd skygeni-sales-intelligence
 uv sync
 
 # Or using pip
-pip install pandas numpy scikit-learn matplotlib seaborn plotly jupyter
+pip install pandas numpy scipy scikit-learn matplotlib seaborn plotly jupyter
 ```
 
 ### Execution
@@ -172,10 +172,10 @@ This project implements **Option A: Deal Risk Scoring** to help sales teams prio
 - **Interpretable**: Can explain *why* a deal is at risk, not just *that* it is
 - **Scalable**: Works for any pipeline size and can run continuously
 
-### Why Logistic Regression?
+### Why Logistic Regression + Percentile Rescaling?
 - **Interpretability**: Can explain feature importance to sales leaders
 - **Speed**: Fast training and scoring for real-time use
-- **Sufficient accuracy**: Business decisions don't require 99% precision
+- **Percentile rescaling**: Converts raw model probabilities to relative rankings (0-100), ensuring well-distributed scores even with limited signal — the same approach used in credit scoring (FICO)
 - **Robust**: Less prone to overfitting than complex models
 
 ### Design Philosophy

@@ -15,6 +15,15 @@ from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
+# Import shared utility functions
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from src.utils import (
+    load_sales_data, calculate_win_rate, format_currency, 
+    format_percentage, get_segment_benchmarks, identify_outliers,
+    print_section_header, print_metric
+)
+
 # Set style for professional visualizations
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
