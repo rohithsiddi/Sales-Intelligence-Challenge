@@ -355,6 +355,3 @@ Immediate Actions Required:
 - Data residency options (EU, US)
 
 ---
-
-*Document Version: 1.0*  
-*Last Updated: February 2026*
