@@ -39,15 +39,10 @@ class SalesDataAnalyzer:
         
     def load_and_validate_data(self):
         """Load and perform initial data validation"""
-        print("=" * 80)
-        print("LOADING AND VALIDATING DATASET")
-        print("=" * 80)
+        print_section_header("LOADING AND VALIDATING DATASET")
         
-        self.df = pd.read_csv(self.data_path)
-        
-        # Convert date columns
-        self.df['created_date'] = pd.to_datetime(self.df['created_date'])
-        self.df['closed_date'] = pd.to_datetime(self.df['closed_date'])
+        # Use shared utility for data loading and date conversion
+        self.df = load_sales_data(self.data_path)
         
         # Extract temporal features
         self.df['created_quarter'] = self.df['created_date'].dt.to_period('Q')
@@ -66,9 +61,7 @@ class SalesDataAnalyzer:
     
     def calculate_custom_metrics(self):
         """Calculate custom metrics: Deal Velocity Score and Pipeline Health Index"""
-        print("\n" + "=" * 80)
-        print("CALCULATING CUSTOM METRICS")
-        print("=" * 80)
+        print_section_header("CALCULATING CUSTOM METRICS")
         
         # Custom Metric 1: Deal Velocity Score
         # Normalized measure of deal speed relative to segment benchmarks
@@ -119,13 +112,11 @@ class SalesDataAnalyzer:
     
     def analyze_win_rate_trends(self):
         """Analyze win rate trends over time and by segment"""
-        print("\n" + "=" * 80)
-        print("ANALYZING WIN RATE TRENDS")
-        print("=" * 80)
+        print_section_header("ANALYZING WIN RATE TRENDS")
         
-        # Overall win rate
-        overall_win_rate = (self.df['outcome'] == 'Won').mean()
-        print(f"\n✓ Overall Win Rate: {overall_win_rate:.2%}")
+        # Overall win rate using utility function
+        overall_win_rate = calculate_win_rate(self.df)
+        print(f"\n✓ Overall Win Rate: {format_percentage(overall_win_rate)}")
         
         # Win rate by quarter
         quarterly_win_rate = self.df.groupby('closed_quarter').apply(
@@ -192,9 +183,7 @@ class SalesDataAnalyzer:
     
     def analyze_sales_rep_performance(self):
         """Analyze sales rep performance and variance"""
-        print("\n" + "=" * 80)
-        print("ANALYZING SALES REP PERFORMANCE")
-        print("=" * 80)
+        print_section_header("ANALYZING SALES REP PERFORMANCE")
         
         rep_performance = self.df.groupby('sales_rep_id').agg({
             'deal_id': 'count',
@@ -206,12 +195,17 @@ class SalesDataAnalyzer:
         rep_performance.columns = ['rep_id', 'deal_count', 'win_rate', 'avg_deal_size', 'avg_cycle_days']
         rep_performance = rep_performance.sort_values('win_rate', ascending=False)
         
+        # Identify deal amount outliers using utility function
+        outlier_mask = identify_outliers(self.df['deal_amount'])
+        outlier_count = outlier_mask.sum()
+        
         print(f"\n✓ Sales Rep Performance Summary:")
-        print(f"  - Total reps: {len(rep_performance)}")
-        print(f"  - Avg win rate: {rep_performance['win_rate'].mean():.2%}")
-        print(f"  - Win rate std dev: {rep_performance['win_rate'].std():.2%}")
-        print(f"  - Top performer: {rep_performance.iloc[0]['rep_id']} ({rep_performance.iloc[0]['win_rate']:.2%})")
-        print(f"  - Bottom performer: {rep_performance.iloc[-1]['rep_id']} ({rep_performance.iloc[-1]['win_rate']:.2%})")
+        print_metric("Total reps", len(rep_performance))
+        print_metric("Avg win rate", rep_performance['win_rate'].mean(), 'percentage')
+        print_metric("Win rate std dev", rep_performance['win_rate'].std(), 'percentage')
+        print(f"  Top performer: {rep_performance.iloc[0]['rep_id']} ({format_percentage(rep_performance.iloc[0]['win_rate'])})")
+        print(f"  Bottom performer: {rep_performance.iloc[-1]['rep_id']} ({format_percentage(rep_performance.iloc[-1]['win_rate'])})")
+        print(f"  Deal amount outliers: {outlier_count} deals ({outlier_count/len(self.df):.1%})")
         
         print(f"\n✓ Top 5 Performers:")
         print(rep_performance.head().to_string(index=False))
@@ -225,9 +219,7 @@ class SalesDataAnalyzer:
     
     def generate_visualizations(self):
         """Generate key visualizations"""
-        print("\n" + "=" * 80)
-        print("GENERATING VISUALIZATIONS")
-        print("=" * 80)
+        print_section_header("GENERATING VISUALIZATIONS")
         
         fig = plt.figure(figsize=(20, 12))
         
@@ -321,9 +313,7 @@ class SalesDataAnalyzer:
     
     def generate_insights_report(self):
         """Generate comprehensive insights report in markdown"""
-        print("\n" + "=" * 80)
-        print("GENERATING INSIGHTS REPORT")
-        print("=" * 80)
+        print_section_header("GENERATING INSIGHTS REPORT")
         
         # Analyze data for insights
         quarterly_data = self.segment_analysis['quarterly']
