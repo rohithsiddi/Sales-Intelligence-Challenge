@@ -100,7 +100,7 @@ The real problem isn't just *knowing* the win rate is down—it's **not knowing 
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/rohithsiddi/-Sales-Intelligence-Challenge.git
 cd SkyGeni
 
 # Install dependencies (using uv)
