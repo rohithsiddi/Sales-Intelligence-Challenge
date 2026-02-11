@@ -196,8 +196,3 @@ See `docs/reflection.md` for detailed discussion of:
 
 ---
 
-## Author
-
-Data Science / Applied AI Engineer Candidate  
-SkyGeni Sales Intelligence Challenge  
-February 2026
