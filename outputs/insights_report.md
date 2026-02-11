@@ -174,5 +174,3 @@ See `outputs/visualizations/` for detailed charts:
 - `deal_velocity_analysis.png`: Deal velocity distribution by outcome
 
 ---
-
-*Report generated: 2026-02-11 20:23:21*
