@@ -175,4 +175,4 @@ See `outputs/visualizations/` for detailed charts:
 
 ---
 
-*Report generated: 2026-02-11 20:10:32*
+*Report generated: 2026-02-11 20:23:21*
