@@ -339,19 +339,3 @@ Immediate Actions Required:
 - **User Adoption**: >80% weekly active users (sales managers)
 
 ---
-
-## Security & Compliance
-
-### Data Security
-- Encryption at rest (AES-256)
-- Encryption in transit (TLS 1.3)
-- API authentication (OAuth 2.0)
-- Role-based access control (RBAC)
-
-### Compliance
-- GDPR compliance (data deletion, portability)
-- SOC 2 Type II certification
-- Regular security audits
-- Data residency options (EU, US)
-
----
